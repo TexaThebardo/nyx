@@ -1,0 +1,233 @@
+-- NYX EXOTIC 2025 - HITBOX BYPASS ULTIMATE + ANIMACIONES + CARGA ÉPICA
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+local hitboxEnabled = false
+local hitboxSize = 7
+local connection = nil
+local originalData = {}
+local guiVisible = false
+
+local partsToHide = {"UpperTorso", "LowerTorso", "Torso", "HumanoidRootPart"}
+
+-- ======================= CARGA ÉPICA EN CONSOLA =======================
+print("")
+print("⚡Iniciando NYX EXOTIC 2025...")
+task.wait(0.8)
+
+local barLength = 40
+for i = 0, 100, 2 do
+    local filled = string.rep("█", math.floor(i/100 * barLength))
+    local empty = string.rep("░", barLength - #filled)
+    print(string.format("\r⏳ Cargando NYX EXOTIC... [%s%s] %d%%", filled, empty, i))
+    task.wait(0.1)
+end
+print("\n✅ NYX EXOTIC CARGADO CORRECTAMENTE")
+print("🔰 Presiona 'H' para abrir/cerrar el menú")
+print("")
+
+-- ======================= GUI CON ANIMACIÓN =======================
+local sg = Instance.new("ScreenGui")
+sg.Name = "NyxExotic_"..math.random(1000000,9999999)
+sg.ResetOnSpawn = false
+sg.Parent = CoreGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 110)
+frame.Position = UDim2.new(1, 0, 0, 20) -- empieza fuera de pantalla (derecha)
+frame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+frame.BackgroundTransparency = 0.45
+frame.BorderSizePixel = 0
+frame.ClipsDescendants = true
+frame.Parent = sg
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+local stroke = Instance.new("UIStroke", frame)
+stroke.Thickness = 2.5
+stroke.Color = Color3.fromRGB(255, 40, 40)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.BackgroundTransparency = 1
+title.Text = "NYX EXOTIC"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 17
+
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(0,160,0,25)
+btn.Position = UDim2.new(0.5,-80,0,35)
+btn.BackgroundColor3 = Color3.fromRGB(255,40,40)
+btn.Text = "OFF"
+btn.TextColor3 = Color3.new(1,1,1)
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 18
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+
+local sliderLabel = Instance.new("TextLabel", frame)
+sliderLabel.Size = UDim2.new(1,0,0,20)
+sliderLabel.Position = UDim2.new(0,0,0,60)
+sliderLabel.BackgroundTransparency = 1
+sliderLabel.Text = "Size hitbox: 7"
+sliderLabel.TextColor3 = Color3.new(1,1,1)
+sliderLabel.Font = Enum.Font.Gotham
+
+local slider = Instance.new("Frame", frame)
+slider.Size = UDim2.new(0,160,0,10)
+slider.Position = UDim2.new(0.5,-80,0,85)
+slider.BackgroundColor3 = Color3.fromRGB(50,50,50)
+Instance.new("UICorner", slider).CornerRadius = UDim.new(0,6)
+
+local fill = Instance.new("Frame", slider)
+fill.Size = UDim2.new(0.35,0,1,0)
+fill.BackgroundColor3 = Color3.fromRGB(255,70,70)
+Instance.new("UICorner", fill).CornerRadius = UDim.new(0,6)
+
+local knob = Instance.new("TextButton", slider)
+knob.Size = UDim2.new(0,18,0,18)
+knob.Position = UDim2.new(0.35,-9,-0.4,0)
+knob.BackgroundColor3 = Color3.new(1,1,1)
+knob.Text = ""
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+
+-- ======================= ANIMACIONES DE ENTRADA/SALIDA =======================
+local function showGUI()
+    if guiVisible then return end
+    guiVisible = true
+    frame.Position = UDim2.new(1, 0, 0, 20) -- fuera
+    frame.Visible = true
+    TweenService:Create(frame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -220, 0, 20)
+    }):Play()
+end
+
+local function hideGUI()
+    if not guiVisible then return end
+    TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Position = UDim2.new(1, 0, 0, 20)
+    }):Play()
+    task.wait(0.5)
+    frame.Visible = false
+    guiVisible = false
+end
+
+-- Toggle con tecla H
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.H then
+        if guiVisible then
+            hideGUI()
+        else
+            showGUI()
+        end
+    end
+end)
+
+-- ======================= FUNCIONES HITBOX (igual que antes) =======================
+-- ... (todo el código de getHead, saveOriginal, expand, restoreAll queda IGUAL que en la versión anterior)
+-- (lo pego completo abajo para que no falte nada)
+
+local function getHead(char)
+    if not char then return nil end
+    local head = char:FindFirstChild("Head")
+    if head and head:IsA("BasePart") then return head end
+    for _, v in char:GetChildren() do
+        if v:IsA("BasePart") and (v.Name:lower():find("head") or v.Name:lower():find("face")) then
+            return v
+        end
+    end
+    return nil
+end
+
+local function saveOriginal(plr)
+    if not plr.Character or originalData[plr] then return end
+    local head = getHead(plr.Character)
+    local data = {Parts = {}}
+    if head then
+        data.Head = {Size = head.Size, Transparency = head.Transparency, CanCollide = head.CanCollide, Massless = head.Massless}
+    end
+    for _, n in ipairs(partsToHide) do
+        local p = plr.Character:FindFirstChild(n)
+        if p then data.Parts[n] = p.Transparency end
+    end
+    originalData[plr] = data
+end
+
+local function expand()
+    for _, plr in Players:GetPlayers() do
+        if plr ~= LocalPlayer and plr.Character then
+            saveOriginal(plr)
+            local head = getHead(plr.Character)
+            if head then
+                head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                head.Transparency = 0.9
+                head.CanCollide = false
+                head.Massless = true
+            end
+            for _, n in ipairs(partsToHide) do
+                local p = plr.Character:FindFirstChild(n)
+                if p then p.Transparency = 1 end
+            end
+        end
+    end
+end
+
+local function restoreAll()
+    for plr, data in pairs(originalData) do
+        if plr.Character then
+            local head = getHead(plr.Character)
+            if head and data.Head then
+                head.Size = data.Head.Size
+                head.Transparency = data.Head.Transparency
+                head.CanCollide = data.Head.CanCollide
+                head.Massless = data.Head.Massless
+            end
+            for n, t in pairs(data.Parts) do
+                local p = plr.Character:FindFirstChild(n)
+                if p then p.Transparency = t end
+            end
+        end
+    end
+end
+
+-- Toggle botón
+btn.MouseButton1Click:Connect(function()
+    hitboxEnabled = not hitboxEnabled
+    btn.Text = hitboxEnabled and "ON" or "OFF"
+    btn.BackgroundColor3 = hitboxEnabled and Color3.fromRGB(0,255,100) or Color3.fromRGB(255,40,40)
+    stroke.Color = hitboxEnabled and Color3.fromRGB(0,255,100) or Color3.fromRGB(255,40,40)
+
+    if hitboxEnabled then
+        connection = RunService.Heartbeat:Connect(expand)
+        print("🟢 NYX EXOTIC ➜ HITBOX ACTIVADO (Size: "..hitboxSize..")")
+    else
+        if connection then connection:Disconnect() end
+        restoreAll()
+        print("🔴 NYX EXOTIC ➜ HITBOX DESACTIVADO")
+    end
+end)
+
+-- Slider
+local dragging = false
+knob.MouseButton1Down:Connect(function() dragging = true end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging then
+        local m = LocalPlayer:GetMouse()
+        local relX = math.clamp((m.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+        fill.Size = UDim2.new(relX,0,1,0)
+        knob.Position = UDim2.new(relX,-9,-0.4,0)
+        hitboxSize = math.floor(3 + relX * 17)
+        sliderLabel.Text = "Size hitbox: " .. hitboxSize
+    end
+end)
+
+-- ¡Listo, rey! Presiona H y disfruta del estilo puro NYX EXOTIC
+print("📌 Menú listo. Presiona H para mostrar/ocultar")
