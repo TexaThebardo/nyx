@@ -328,7 +328,7 @@ if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
     local mobileBtn = Instance.new("ImageButton")
     mobileBtn.Name = "NyxMobileToggle"
     mobileBtn.Size = UDim2.new(0, 40, 0, 40)
-    mobileBtn.Position = UDim2.new(0.085, -100, 0.384, -100)
+    mobileBtn.Position = UDim2.new(0.118,-100,0.387,-100)
     mobileBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
     mobileBtn.BackgroundTransparency = 0.3
     mobileBtn.Image = "rbxassetid://134422370240023" -- Ícono X rojo
@@ -374,10 +374,10 @@ if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
 
     -- Efecto al presionar
     mobileBtn.MouseButton1Down:Connect(function()
-        TweenService:Create(mobileBtn, TweenInfo.new(0.1), {Size = UDim2.new(0,35,0,35)}):Play()
+        TweenService:Create(mobileBtn, TweenInfo.new(0.1), {Size = UDim2.new(0,40,0,40)}):Play()
     end)
     mobileBtn.MouseButton1Up:Connect(function()
-        TweenService:Create(mobileBtn, TweenInfo.new(0.1), {Size = UDim2.new(0,40,0,40)}):Play()
+        TweenService:Create(mobileBtn, TweenInfo.new(0.1), {Size = UDim2.new(0,45,0,45)}):Play()
     end)
 end
 
