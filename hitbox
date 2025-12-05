@@ -242,7 +242,7 @@ local function expand()
                     }
                 end
                 part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                part.Transparency = 0.7
+                part.Transparency = 1
                 part.CanCollide = false
                 part.Massless = true
             end
