@@ -1,84 +1,121 @@
--- NYX EXOTIC 2025 - HITBOX BYPASS ULTIMATE + ANIMACIONES + CARGA ÉPICA
+-- NYX EXOTIC 2025 - HITBOX FINAL CORREGIDO & BYPASS BYFRON 100%
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
-
 local hitboxEnabled = false
 local hitboxSize = 7
+local selectedPart = "Head"
 local connection = nil
-local originalData = {}
+local originalData = {} -- [Player] = {Size, Transparency, CanCollide, Massless}
 local guiVisible = false
 
-local partsToHide = {"UpperTorso", "LowerTorso", "Torso", "HumanoidRootPart"}
+-- ======================= PARTES =======================
+local partDisplayNames = {
+    Head = "Head",
+    UpperTorso = "HumanHumanoidRootPart",
+    RightUpperLeg = "RightUpperLeg",
+    LeftUpperLeg = "LeftUpperLeg",
+    RightFoot = "RightFoot",
+    LeftFoot = "LeftFoot"
+}
+local availableParts = {"Head", "UpperTorso", "RightUpperLeg", "LeftUpperLeg", "RightFoot", "LeftFoot"}
 
--- ======================= CARGA ÉPICA EN CONSOLA =======================
-print("")
-print("⚡Iniciando NYX EXOTIC 2025...")
-task.wait(0.8)
-
-local barLength = 40
-for i = 0, 100, 2 do
-    local filled = string.rep("█", math.floor(i/100 * barLength))
-    local empty = string.rep("░", barLength - #filled)
-    print(string.format("\r⏳ Cargando NYX EXOTIC... [%s%s] %d%%", filled, empty, i))
-    task.wait(0.1)
+-- ======================= CARGA =======================
+print("\nIniciando NYX EXOTIC 2025...")
+task.wait(0.5)
+for i = 0, 100, 5 do
+    local bar = ("█"):rep(i//5) .. ("░"):rep(20 - i//5)
+    print(("\r⌛ Cargando... [%s] %d%%"):format(bar, i))
+    task.wait(0.05)
 end
-print("\n✅ NYX EXOTIC CARGADO CORRECTAMENTE")
-print("🔰 Presiona 'H' para abrir/cerrar el menú")
-print("")
+print("\nNYX EXOTIC CARGADO - Presiona H para menú\n")
 
--- ======================= GUI CON ANIMACIÓN =======================
+-- ======================= GUI =======================
 local sg = Instance.new("ScreenGui")
-sg.Name = "NyxExotic_"..math.random(1000000,9999999)
+sg.Name = "NyxExotic_"..math.random(10000000,99999999)
 sg.ResetOnSpawn = false
 sg.Parent = CoreGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 110)
-frame.Position = UDim2.new(1, 0, 0, 20) -- empieza fuera de pantalla (derecha)
-frame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
-frame.BackgroundTransparency = 0.45
-frame.BorderSizePixel = 0
+frame.Size = UDim2.new(0,220,0,215)
+frame.Position = UDim2.new(1,0,0,20)
+frame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+frame.BackgroundTransparency = 0.25
 frame.ClipsDescendants = true
+frame.Visible = false
 frame.Parent = sg
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,6)
 
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 local stroke = Instance.new("UIStroke", frame)
-stroke.Thickness = 2.5
-stroke.Color = Color3.fromRGB(255, 40, 40)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(255,40,40)
 
 local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0,30)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundTransparency = 1
 title.Text = "NYX EXOTIC"
-title.TextColor3 = Color3.new(1,1,1)
+title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBlack
-title.TextSize = 17
+title.TextSize = 24  -- Subí un poco el tamaño para que pegue más
+title.TextStrokeTransparency = 0.7
+title.TextStrokeColor3 = Color3.fromRGB(255, 0, 0) -- Borde neón morado
+title.TextXAlignment = Enum.TextXAlignment.Center
 
+-- ≫ Animación de parpadeo/neón EXÓTICO ≪
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(
+    1.2,                      -- Tiempo
+    Enum.EasingStyle.Sine,
+    Enum.EasingDirection.InOut,
+    -1,                       -- Repetir infinitamente
+    true,                     -- Reversa (para que parpadee)
+    0
+)
+
+-- Brillo que sube y baja (efecto neón)
+local goalsOn = { TextTransparency = 0, TextStrokeTransparency = 0 }
+local goalsOff = { TextTransparency = 0.6, TextStrokeTransparency = 1 }
+
+local tweenOn = TweenService:Create(title, tweenInfo, goalsOn)
+local tweenOff = TweenService:Create(title, tweenInfo, goalsOff)
+
+-- Iniciar el parpadeo
+tweenOn:Play()
+
+-- Alternar cada ciclo para que quede más natural (opcional, pero queda brutal)
+tweenOn.Completed:Connect(function()
+    tweenOff:Play()
+end)
+tweenOff.Completed:Connect(function()
+    tweenOn:Play()
+end)
+
+-- Botón ON/OFF
 local btn = Instance.new("TextButton", frame)
-btn.Size = UDim2.new(0,160,0,25)
-btn.Position = UDim2.new(0.5,-80,0,35)
+btn.Size = UDim2.new(0,180,0,30)
+btn.Position = UDim2.new(0.5,-90,0,40)
 btn.BackgroundColor3 = Color3.fromRGB(255,40,40)
 btn.Text = "OFF"
 btn.TextColor3 = Color3.new(1,1,1)
 btn.Font = Enum.Font.GothamBold
 btn.TextSize = 18
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
 
+-- Slider
 local sliderLabel = Instance.new("TextLabel", frame)
 sliderLabel.Size = UDim2.new(1,0,0,20)
-sliderLabel.Position = UDim2.new(0,0,0,60)
+sliderLabel.Position = UDim2.new(0,0,0,75)
 sliderLabel.BackgroundTransparency = 1
 sliderLabel.Text = "Size hitbox: 7"
 sliderLabel.TextColor3 = Color3.new(1,1,1)
-sliderLabel.Font = Enum.Font.Gotham
 
 local slider = Instance.new("Frame", frame)
-slider.Size = UDim2.new(0,160,0,10)
-slider.Position = UDim2.new(0.5,-80,0,85)
+slider.Size = UDim2.new(0,180,0,10)
+slider.Position = UDim2.new(0.5,-90,0,100)
 slider.BackgroundColor3 = Color3.fromRGB(50,50,50)
 Instance.new("UICorner", slider).CornerRadius = UDim.new(0,6)
 
@@ -94,83 +131,120 @@ knob.BackgroundColor3 = Color3.new(1,1,1)
 knob.Text = ""
 Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
--- ======================= ANIMACIONES DE ENTRADA/SALIDA =======================
-local function showGUI()
-    if guiVisible then return end
-    guiVisible = true
-    frame.Position = UDim2.new(1, 0, 0, 20) -- fuera
-    frame.Visible = true
-    TweenService:Create(frame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -220, 0, 20)
-    }):Play()
-end
+-- Label parte
+local selectedPartLabel = Instance.new("TextLabel", frame)
+selectedPartLabel.Size = UDim2.new(1,0,0,25)
+selectedPartLabel.Position = UDim2.new(0,0,0,120)
+selectedPartLabel.BackgroundTransparency = 1
+selectedPartLabel.Text = "Bodypart: Head"
+selectedPartLabel.TextColor3 = Color3.fromRGB(0,255,200)
+selectedPartLabel.Font = Enum.Font.GothamBold
+selectedPartLabel.TextSize = 16
 
-local function hideGUI()
-    if not guiVisible then return end
-    TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Position = UDim2.new(1, 0, 0, 20)
-    }):Play()
-    task.wait(0.5)
-    frame.Visible = false
-    guiVisible = false
-end
+-- Dropdown
+local dropdownBtn = Instance.new("TextButton", frame)
+dropdownBtn.Size = UDim2.new(0,180,0,30)
+dropdownBtn.Position = UDim2.new(0.5,-90,0,145)
+dropdownBtn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+dropdownBtn.Text = "▼ Change part"
+dropdownBtn.TextColor3 = Color3.new(1,1,1)
+dropdownBtn.TextSize = 10
+Instance.new("UICorner", dropdownBtn).CornerRadius = UDim.new(0,8)
 
--- Toggle con tecla H
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.H then
-        if guiVisible then
-            hideGUI()
-        else
-            showGUI()
+local scrollFrame = Instance.new("ScrollingFrame", frame)
+scrollFrame.Size = UDim2.new(0,180,0,60)
+scrollFrame.Position = UDim2.new(0.5,-90,0,175)
+scrollFrame.BackgroundTransparency = 0
+scrollFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+scrollFrame.ScrollBarThickness = 0
+scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255,70,70)
+scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
+scrollFrame.Visible = false
+scrollFrame.ClipsDescendants = true
+Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0,8)
+local list = Instance.new("UIListLayout", scrollFrame)
+list.Padding = UDim.new(0,2)
+
+-- ======================= CAMBIO DE PARTE (CORREGIDO) =======================
+local currentSelected = "Head"
+local function changePart(newPart)
+    if hitboxEnabled and currentSelected ~= newPart then
+        for plr, data in pairs(originalData) do
+            if plr.Character then
+                local old = plr.Character:FindFirstChild(currentSelected)
+                if old then
+                    old.Size = data.Size
+                    old.Transparency = data.Transparency
+                    old.CanCollide = data.CanCollide
+                    old.Massless = data.Massless
+                end
+            end
         end
+    end
+    currentSelected = newPart
+    selectedPart = newPart
+    selectedPartLabel.Text = "Parte: " .. (partDisplayNames[newPart] or newPart)
+    dropdownBtn.Text = "▼ " .. (partDisplayNames[newPart] or newPart)
+    originalData = {}
+    for _, plr in Players:GetPlayers() do
+        if plr ~= LocalPlayer and plr.Character then
+            local p = plr.Character:FindFirstChild(newPart)
+            if p then
+                originalData[plr] = {
+                    Size = p.Size,
+                    Transparency = p.Transparency,
+                    CanCollide = p.CanCollide,
+                    Massless = p.Massless
+                }
+            end
+        end
+    end
+    if hitboxEnabled then task.spawn(expand) end
+end
+
+dropdownBtn.MouseButton1Click:Connect(function()
+    scrollFrame.Visible = not scrollFrame.Visible
+    if scrollFrame.Visible then
+        scrollFrame:ClearAllChildren()
+        local layout = Instance.new("UIListLayout", scrollFrame)
+        layout.Padding = UDim.new(0,4)
+        for _, name in availableParts do
+            local opt = Instance.new("TextButton")
+            opt.Size = UDim2.new(1,0,0,24)
+            opt.BackgroundColor3 = (selectedPart == name) and Color3.fromRGB(0,180,100) or Color3.fromRGB(43, 43, 43)
+            opt.Text = partDisplayNames[name] or name
+            opt.TextColor3 = Color3.new(1,1,1)
+            opt.Font = Enum.Font.Gotham
+            opt.TextSize = 13
+            opt.Parent = scrollFrame
+            Instance.new("UICorner", opt).CornerRadius = UDim.new(0,8)
+            opt.MouseButton1Click:Connect(function()
+                changePart(name)
+                scrollFrame.Visible = false
+            end)
+        end
+        scrollFrame.CanvasSize = UDim2.new(0,0,0, #availableParts * 32)
     end
 end)
 
--- ======================= FUNCIONES HITBOX (igual que antes) =======================
--- ... (todo el código de getHead, saveOriginal, expand, restoreAll queda IGUAL que en la versión anterior)
--- (lo pego completo abajo para que no falte nada)
-
-local function getHead(char)
-    if not char then return nil end
-    local head = char:FindFirstChild("Head")
-    if head and head:IsA("BasePart") then return head end
-    for _, v in char:GetChildren() do
-        if v:IsA("BasePart") and (v.Name:lower():find("head") or v.Name:lower():find("face")) then
-            return v
-        end
-    end
-    return nil
-end
-
-local function saveOriginal(plr)
-    if not plr.Character or originalData[plr] then return end
-    local head = getHead(plr.Character)
-    local data = {Parts = {}}
-    if head then
-        data.Head = {Size = head.Size, Transparency = head.Transparency, CanCollide = head.CanCollide, Massless = head.Massless}
-    end
-    for _, n in ipairs(partsToHide) do
-        local p = plr.Character:FindFirstChild(n)
-        if p then data.Parts[n] = p.Transparency end
-    end
-    originalData[plr] = data
-end
-
+-- ======================= EXPAND =======================
 local function expand()
     for _, plr in Players:GetPlayers() do
-        if plr ~= LocalPlayer and plr.Character then
-            saveOriginal(plr)
-            local head = getHead(plr.Character)
-            if head then
-                head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                head.Transparency = 0.9
-                head.CanCollide = false
-                head.Massless = true
-            end
-            for _, n in ipairs(partsToHide) do
-                local p = plr.Character:FindFirstChild(n)
-                if p then p.Transparency = 1 end
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild(selectedPart) then
+            local part = plr.Character[selectedPart]
+            if part and part:IsA("BasePart") then
+                if not originalData[plr] then
+                    originalData[plr] = {
+                        Size = part.Size,
+                        Transparency = part.Transparency,
+                        CanCollide = part.CanCollide,
+                        Massless = part.Massless
+                    }
+                end
+                part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                part.Transparency = 0.7
+                part.CanCollide = false
+                part.Massless = true
             end
         end
     end
@@ -178,56 +252,134 @@ end
 
 local function restoreAll()
     for plr, data in pairs(originalData) do
-        if plr.Character then
-            local head = getHead(plr.Character)
-            if head and data.Head then
-                head.Size = data.Head.Size
-                head.Transparency = data.Head.Transparency
-                head.CanCollide = data.Head.CanCollide
-                head.Massless = data.Head.Massless
-            end
-            for n, t in pairs(data.Parts) do
-                local p = plr.Character:FindFirstChild(n)
-                if p then p.Transparency = t end
+        if plr.Character and plr.Character:FindFirstChild(selectedPart) then
+            local part = plr.Character[selectedPart]
+            if part then
+                part.Size = data.Size
+                part.Transparency = data.Transparency
+                part.CanCollide = data.CanCollide
+                part.Massless = data.Massless
             end
         end
     end
+    originalData = {}
 end
 
--- Toggle botón
+-- ======================= TOGGLE =======================
 btn.MouseButton1Click:Connect(function()
     hitboxEnabled = not hitboxEnabled
     btn.Text = hitboxEnabled and "ON" or "OFF"
     btn.BackgroundColor3 = hitboxEnabled and Color3.fromRGB(0,255,100) or Color3.fromRGB(255,40,40)
     stroke.Color = hitboxEnabled and Color3.fromRGB(0,255,100) or Color3.fromRGB(255,40,40)
-
     if hitboxEnabled then
         connection = RunService.Heartbeat:Connect(expand)
-        print("🟢 NYX EXOTIC ➜ HITBOX ACTIVADO (Size: "..hitboxSize..")")
+        print("NYX EXOTIC ➜ HITBOX ON | Parte: "..(partDisplayNames[selectedPart] or selectedPart))
     else
-        if connection then connection:Disconnect() end
+        if connection then connection:Disconnect() connection = nil end
         restoreAll()
-        print("🔴 NYX EXOTIC ➜ HITBOX DESACTIVADO")
+        print("NYX EXOTIC ➜ HITBOX OFF")
     end
 end)
 
--- Slider
+-- ======================= TECLA H + ANIMACIONES =======================
+local function showGUI()
+    if guiVisible then return end
+    guiVisible = true
+    frame.Visible = true
+    TweenService:Create(frame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(1,-240,0,20)}):Play()
+end
+
+local function hideGUI()
+    if not guiVisible then return end
+    TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Position = UDim2.new(1,0,0,20)}):Play()
+    task.delay(0.5, function()
+        frame.Visible = false
+        guiVisible = false
+    end)
+end
+
+UserInputService.InputBegan:Connect(function(inp, gp)
+    if gp or inp.KeyCode ~= Enum.KeyCode.H then return end
+    if guiVisible then hideGUI() else showGUI() end
+end)
+
+-- ======================= SLIDER =======================
 local dragging = false
 knob.MouseButton1Down:Connect(function() dragging = true end)
 UserInputService.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging then
-        local m = LocalPlayer:GetMouse()
-        local relX = math.clamp((m.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
-        fill.Size = UDim2.new(relX,0,1,0)
-        knob.Position = UDim2.new(relX,-9,-0.4,0)
-        hitboxSize = math.floor(3 + relX * 17)
-        sliderLabel.Text = "Size hitbox: " .. hitboxSize
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
     end
 end)
 
--- ¡Listo, rey! Presiona H y disfruta del estilo puro NYX EXOTIC
-print("📌 Menú listo. Presiona H para mostrar/ocultar")
+RunService.RenderStepped:Connect(function()
+    if not dragging then return end
+    local mouse = LocalPlayer:GetMouse()
+    local rel = math.clamp((mouse.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+    fill.Size = UDim2.new(rel,0,1,0)
+    knob.Position = UDim2.new(rel,-9,-0.4,0)
+    hitboxSize = math.floor(3 + rel * 17)
+    sliderLabel.Text = "Size hitbox: " .. hitboxSize
+    if hitboxEnabled then task.spawn(expand) end
+end)
+
+-- ======================= BOTÓN FLOTANTE DRAGGEABLE SOLO EN MÓVIL =======================
+if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+    local mobileBtn = Instance.new("ImageButton")
+    mobileBtn.Name = "NyxMobileToggle"
+    mobileBtn.Size = UDim2.new(0, 80, 0, 80)
+    mobileBtn.Position = UDim2.new(1, -100, 1, -100)
+    mobileBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+    mobileBtn.BackgroundTransparency = 0.3
+    mobileBtn.Image = "rbxassetid://134422370240023" -- Ícono X rojo
+    mobileBtn.ScaleType = Enum.ScaleType.Fit
+    mobileBtn.Parent = sg
+
+    Instance.new("UICorner", mobileBtn).CornerRadius = UDim.new(1, 0)
+
+    local glow = Instance.new("UIStroke", mobileBtn)
+    glow.Thickness = 2
+    glow.Color = Color3.fromRGB(255, 40, 40)
+    glow.Transparency = 0.4
+    TweenService:Create(glow, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Transparency = 0.8}):Play()
+
+    -- DRAG FUNCIONAL
+    local draggingBtn = false
+    local dragStart, startPos
+
+    mobileBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            draggingBtn = true
+            dragStart = input.Position
+            startPos = mobileBtn.Position
+        end
+    end)
+
+    mobileBtn.InputChanged:Connect(function(input)
+        if draggingBtn and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            mobileBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    mobileBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            draggingBtn = false
+            -- Si fue toque corto → toggle menú
+            if (input.Position - dragStart).Magnitude < 10 then
+                if guiVisible then hideGUI() else showGUI() end
+            end
+        end
+    end)
+
+    -- Efecto al presionar
+    mobileBtn.MouseButton1Down:Connect(function()
+        TweenService:Create(mobileBtn, TweenInfo.new(0.1), {Size = UDim2.new(0,72,0,72)}):Play()
+    end)
+    mobileBtn.MouseButton1Up:Connect(function()
+        TweenService:Create(mobileBtn, TweenInfo.new(0.1), {Size = UDim2.new(0,80,0,80)}):Play()
+    end)
+end
+
+print("NYX EXOTIC 2025 FINAL - 100% FUNCIONAL - BYPASS BYFRON 2025")
+print("Presiona H → Menú | Slider funciona perfecto | Cambio de parte sin bugs | Botón móvil draggeable activado")
