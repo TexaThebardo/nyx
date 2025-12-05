@@ -335,7 +335,7 @@ if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
     mobileBtn.ScaleType = Enum.ScaleType.Fit
     mobileBtn.Parent = sg
 
-    Instance.new("UICorner", mobileBtn).CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", mobileBtn).CornerRadius = UDim.new(50, 0)
 
     local glow = Instance.new("UIStroke", mobileBtn)
     glow.Thickness = 2
