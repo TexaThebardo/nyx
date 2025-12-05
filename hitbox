@@ -328,7 +328,7 @@ if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
     local mobileBtn = Instance.new("ImageButton")
     mobileBtn.Name = "NyxMobileToggle"
     mobileBtn.Size = UDim2.new(0, 40, 0, 40)
-    mobileBtn.Position = UDim2.new(0.118,-100,0.387,-100)
+    mobileBtn.Position = UDim2.new(0.128, -100,0.38, -100)
     mobileBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
     mobileBtn.BackgroundTransparency = 0.3
     mobileBtn.Image = "rbxassetid://134422370240023" -- Ícono X rojo
