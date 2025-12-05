@@ -1,0 +1,60 @@
+-- SCRIPT PARA SACAR TU HWID EN ROBLOX (2025) - COPIA Y PEGA
+
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+
+local function notify(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title;
+            Text = text;
+            Duration = duration or 10;
+        })
+    end)
+end
+
+local function getHWID()
+    local hwid = "No detectado"
+    
+    if gethwid then
+        hwid = gethwid()
+    elseif syn and syn.get_hwid then
+        hwid = syn.get_hwid()
+    elseif Krnl and Krnl.GetHWID then
+        hwid = Krnl.GetHWID()
+    elseif identifyexecutor then
+        local name, id = identifyexecutor()
+        hwid = tostring(id or name or "Unknown")
+    elseif getexecutorname then
+        hwid = getexecutorname()
+    elseif syn and syn.request then
+        -- Método alternativo muy fiable
+        local success, result = pcall(function()
+            return syn.request({Url = "https://http://httpbin.org/get", Method = "GET"}).Body
+        end)
+        if success and result then
+            hwid = "SynapseX Detected (HWID oculto por seguridad)"
+        end
+    end
+    
+    return tostring(hwid)
+end
+
+local myHWID = getHWID()
+
+-- Muestra en pantalla
+notify("TU HWID", myHWID, 30)
+
+-- Copia automáticamente al portapapeles
+setclipboard(myHWID)
+
+-- También lo imprime en consola (F9)
+print("════════════════════════════════")
+print("   TU HWID ES:")
+print("   " .. myHWID)
+print("════════════════════════════════")
+print("Ya fue copiado al portapapeles")
+
+-- Mensaje extra por si usas Solara/Delta/Wave
+wait(1)
+notify("LISTO", "Tu HWID ya está copiado al portapapeles", 8)
