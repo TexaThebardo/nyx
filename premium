@@ -2208,19 +2208,10 @@ local hitboxSize = 5
 local selectedPart = "Head"
 local connection = nil
 local originalData = {}
-local highlights = {}
-local friendsTeam = {}  -- Lista de amigos (por Name o DisplayName)
+local friendsTeam = {} -- Lista de amigos (por Name o DisplayName)
 
 -- Toggles
 local aliveCheckEnabled = true
-local highlightOnlyHead = false
-
--- Highlight settings
-local highlightSettings = {
-    FillColor = Color3.fromRGB(255, 170, 100),
-    OutlineColor = Color3.fromRGB(255, 120, 0),
-    FillTransparency = 0.5
-}
 
 local availableParts = {"Head", "UpperTorso", "RightUpperLeg", "LeftUpperLeg", "RightFoot", "LeftFoot"}
 
@@ -2239,34 +2230,15 @@ local function expand()
     for _, plr in Players:GetPlayers() do
         if plr ~= LocalPlayer and plr.Character and not isFriend(plr) then
             if aliveCheckEnabled and not isPlayerAlive(plr) then continue end
-
             local part = plr.Character:FindFirstChild(selectedPart)
             if part and part:IsA("BasePart") then
                 if not originalData[plr] then
                     originalData[plr] = {Size = part.Size, Transparency = part.Transparency, CanCollide = part.CanCollide, Massless = part.Massless}
                 end
-
                 part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
                 part.Transparency = 0.6
                 part.CanCollide = false
                 part.Massless = true
-
-                if not highlights[plr] then
-                    local highlight = Instance.new("Highlight")
-                    highlight.FillColor = highlightSettings.FillColor
-                    highlight.OutlineColor = highlightSettings.OutlineColor
-                    highlight.FillTransparency = highlightSettings.FillTransparency
-                    highlight.OutlineTransparency = 0
-                    highlight.Adornee = highlightOnlyHead and (plr.Character:FindFirstChild("Head") or plr.Character) or plr.Character
-                    highlight.Parent = plr.Character
-                    highlights[plr] = highlight
-                else
-                    local hl = highlights[plr]
-                    hl.FillColor = highlightSettings.FillColor
-                    hl.OutlineColor = highlightSettings.OutlineColor
-                    hl.FillTransparency = highlightSettings.FillTransparency
-                    hl.Adornee = highlightOnlyHead and (plr.Character:FindFirstChild("Head") or plr.Character) or plr.Character
-                end
             end
         end
     end
@@ -2283,7 +2255,6 @@ local function restoreAll()
                 part.Massless = data.Massless
             end
         end
-        if highlights[plr] then highlights[plr]:Destroy() highlights[plr] = nil end
     end
     originalData = {}
 end
@@ -2309,28 +2280,7 @@ HitboxBox:AddToggle("AliveCheck", {Text = "Alive Check", Default = true, Callbac
     if hitboxEnabled then restoreAll() task.wait(0.05) expand() end
 end})
 
-HitboxBox:AddToggle("HighlightOnlyHead", {Text = "Highlight Only on Head", Default = false, Callback = function(state)
-    highlightOnlyHead = state
-    if hitboxEnabled then restoreAll() task.wait(0.05) expand() end
-end})
-
 HitboxBox:AddDivider()
-HitboxBox:AddLabel("Highlight Settings")
-
-HitboxBox:AddLabel("Fill Color"):AddColorPicker("HighlightFillColor", {Default = highlightSettings.FillColor, Callback = function(color)
-    highlightSettings.FillColor = color
-    if hitboxEnabled then task.spawn(expand) end
-end})
-
-HitboxBox:AddLabel("Outline Color"):AddColorPicker("HighlightOutlineColor", {Default = highlightSettings.OutlineColor, Callback = function(color)
-    highlightSettings.OutlineColor = color
-    if hitboxEnabled then task.spawn(expand) end
-end})
-
-HitboxBox:AddSlider("HighlightTransparency", {Text = "Fill Transparency", Default = 0, Min = 0, Max = 100, Rounding = 1, Callback = function(value)
-    highlightSettings.FillTransparency = value / 100
-    if hitboxEnabled then task.spawn(expand) end
-end})
 
 HitboxBox:AddDropdown("HitboxPart", {Values = availableParts, Default = 1, Text = "Target Body Part", Callback = function(part)
     if hitboxEnabled then restoreAll() selectedPart = part task.wait(0.05) expand() else selectedPart = part end
@@ -2342,11 +2292,10 @@ HitboxBox:AddSlider("HitboxSize", {Text = "Hitbox Size", Default = 5, Min = 0, M
     if hitboxEnabled then task.spawn(expand) end
 end})
 
--- ======================= FRIENDS TEAM (IGUAL QUE EN ESP NAME) =======================
+-- ======================= FRIENDS TEAM =======================
 HitboxBox:AddDivider()
 HitboxBox:AddLabel("Friends Team")
 
--- Dropdown con "----" por defecto (igual que en tu ESP Name)
 local playerDropdown = HitboxBox:AddDropdown("FriendPlayerSelect", {
     Text = "Select Player",
     Values = {"----"},
@@ -2354,9 +2303,8 @@ local playerDropdown = HitboxBox:AddDropdown("FriendPlayerSelect", {
     Callback = function() end
 })
 
--- Función para actualizar la lista (copia exacta del ESP Name)
 local function UpdatePlayerDropdown()
-    local values = {"----"} -- Siempre mantiene "----" como primera opción
+    local values = {"----"}
     for _, plr in Players:GetPlayers() do
         if plr ~= LocalPlayer then
             table.insert(values, plr.DisplayName .. " (" .. plr.Name .. ")")
@@ -2365,19 +2313,14 @@ local function UpdatePlayerDropdown()
     if #values == 1 then
         values = {"---- (No players)"}
     end
-
     playerDropdown:SetValues(values)
-
-    -- Forzar que siga seleccionado "----" si no había selección válida
     if playerDropdown.Value == "----" or playerDropdown.Value == nil or not table.find(values, playerDropdown.Value) then
         playerDropdown:SetValue("----")
     end
 end
 
--- Actualizar al cargar
 UpdatePlayerDropdown()
 
--- Actualizar cuando entren/salgan jugadores
 Players.PlayerAdded:Connect(function(plr)
     if plr ~= LocalPlayer then
         task.wait(0.1)
@@ -2390,49 +2333,39 @@ Players.PlayerRemoving:Connect(function()
     UpdatePlayerDropdown()
 end)
 
--- Botón Confirmar amigo
 HitboxBox:AddButton("Add to Friends Team", function()
     local selected = playerDropdown.Value
     if not selected or selected == "----" or selected == "---- (No players)" then
         Library:Notify("Select a player first", 3)
         return
     end
-
     local username = selected:match("%((.-)%)")
     local displayname = selected:match("(.-)%s%(") or selected
     local targetName = username or displayname
-
     if not table.find(friendsTeam, targetName) then
         table.insert(friendsTeam, targetName)
         Library:Notify("Friend added: " .. selected .. " → Immune", 4)
-
         if hitboxEnabled then
             restoreAll()
             task.wait(0.05)
             expand()
         end
-
-        -- Volver a "----" después de confirmar
         playerDropdown:SetValue("----")
     else
         Library:Notify("Already in Friends Team", 3)
     end
 end)
 
--- Botón Clear Friends
 HitboxBox:AddButton("Clear Friends Team", function()
     friendsTeam = {}
     Library:Notify("Friends Team cleared", 4)
-
     if hitboxEnabled then
         restoreAll()
         task.wait(0.05)
         expand()
     end
-
     playerDropdown:SetValue("----")
 end)
-
 
 local AntiAFKConnection
 CharacterBox:AddToggle("Anti-AFK", {
