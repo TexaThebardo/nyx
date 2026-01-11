@@ -466,193 +466,362 @@ CharacterBox:AddToggle("Fullbright", {
     end
 })
 
-local ESPV2Box = Tabs.Visuals:AddRightGroupbox("ESP V2 (New)", "anvil")
+local ESPV2Box = Tabs.Visuals:AddRightGroupbox("ESP V2 (Ultra Optimized)", "anvil")
 
 local Players         = game:GetService("Players")
 local RunService      = game:GetService("RunService")
-local TextService     = game:GetService("TextService")
 local Camera          = workspace.CurrentCamera
 local LocalPlayer     = Players.LocalPlayer
 
--- Configuración
+-- Configuration
 local ToolsESP_Enabled = false
-local TEXT_SIZE        = 10
-local MAX_WIDTH        = 380
+local TEXT_SIZE        = 12
+local FOOT_OFFSET      = 2.5
 
-local espDrawings = {}
+-- Ultra-fast cache system
+local espCache = {}
+local Vector2_new = Vector2.new
+local Vector3_new = Vector3.new
+local Color3_fromRGB = Color3.fromRGB
+local Color3_new = Color3.new
+local WorldToViewportPoint = Camera.WorldToViewportPoint
 
--- Herramientas que NO se muestran
+-- Pre-computed tool lookups (exact names)
 local HIDDEN_TOOLS = {
-    "empty bag","marshmallow","small marshmallow bag","medium marshmallow bag","large marshmallow bag",
-    "hot chips","jason mask","bandana","black gloves","potato chips","potato","ghost skull face half mask",
-    "black surgical mask","black surgical","skimask","flour","card","gelatin","lockpick","sugar block bag",
-    "crowbar","water","fake id","fist","phone","standard clip","speed loader","extended clip",
-    "heavy magazine","drum magazine","crate"
+    ["empty bag"] = true, ["marshmallow"] = true, ["small marshmallow bag"] = true,
+    ["medium marshmallow bag"] = true, ["large marshmallow bag"] = true, ["hot chips"] = true,
+    ["jason mask"] = true, ["bandana"] = true, ["black gloves"] = true, ["potato chips"] = true,
+    ["potato"] = true, ["ghost skull face half mask"] = true, ["black surgical mask"] = true,
+    ["black surgical"] = true, ["skimask"] = true, ["flour"] = true, ["card"] = true,
+    ["gelatin"] = true, ["lockpick"] = true, ["sugar block bag"] = true, ["crowbar"] = true,
+    ["water"] = true, ["fake id"] = true, ["fist"] = true, ["phone"] = true, ["standard clip"] = true,
+    ["speed loader"] = true, ["extended clip"] = true, ["heavy magazine"] = true,
+    ["drum magazine"] = true, ["crate"] = true
 }
 
--- Armas peligrosas → COLOR MORADO
 local SPECIAL_TOOLS = {
-    "prl-16","arp9","g21s drum","mpx","honey badger pistol","ddm4 v7 pistol","ar pistol","draco","tec-9","mcx",
-    ".308 ar-10","honey badger","m&p-15 sport ii","300 blackout","micro draco","micro arp","ak draco",
-    "suppressed mcx","suppressed arp","whiteout ar9","whiteout arp9","fn57","g19xext","machete",
-    "springfieldxd mod",".308 ar-10 drum","honey badger drum","m&p-15 sport ii drum","micro draco drum",
-    "300 blackout drum","micro arp drum","ak draco drum","tan 300 blk mcx","springfieldxd drum","mcx drum",
-    "g19xdrum","tec-9 drum","fn57drum","arp drum","taurus drum","five seven drum","five-seven drum",
-    "plr-16 drum","g23 drum","vp9 drum","p80 drum","glocks drum","draco drum","glock 20 drum",
-    "hi-point drum","g22drum","binary black draco","binary g17 gen 5","binary 300 blackout arp",
-    "binary 6in ar9","ddm4 v7 drum","mpx drum","g26 clear drum","black micro drac","arp9 clear drum",
-    "black micro draco"
+    ["prl-16"] = true, ["arp9"] = true, ["g21s drum"] = true, ["mpx"] = true,
+    ["honey badger pistol"] = true, ["ddm4 v7 pistol"] = true, ["ar pistol"] = true,
+    ["draco"] = true, ["tec-9"] = true, ["mcx"] = true, [".308 ar-10"] = true,
+    ["honey badger"] = true, ["m&p-15 sport ii"] = true, ["300 blackout"] = true,
+    ["micro draco"] = true, ["micro arp"] = true, ["ak draco"] = true,
+    ["suppressed mcx"] = true, ["suppressed arp"] = true, ["whiteout ar9"] = true,
+    ["whiteout arp9"] = true, ["fn57"] = true, ["g19xext"] = true, ["machete"] = true,
+    ["springfieldxd mod"] = true, [".308 ar-10 drum"] = true, ["honey badger drum"] = true,
+    ["m&p-15 sport ii drum"] = true, ["micro draco drum"] = true, ["300 blackout drum"] = true,
+    ["micro arp drum"] = true, ["ak draco drum"] = true, ["tan 300 blk mcx"] = true,
+    ["springfieldxd drum"] = true, ["mcx drum"] = true, ["g19xdrum"] = true, ["tec-9 drum"] = true,
+    ["fn57drum"] = true, ["arp drum"] = true, ["taurus drum"] = true, ["five seven drum"] = true,
+    ["five-seven drum"] = true, ["plr-16 drum"] = true, ["g23 drum"] = true, ["vp9 drum"] = true,
+    ["p80 drum"] = true, ["glocks drum"] = true, ["draco drum"] = true, ["glock 20 drum"] = true,
+    ["hi-point drum"] = true, ["g22drum"] = true, ["binary black draco"] = true,
+    ["binary g17 gen 5"] = true, ["binary 300 blackout arp"] = true, ["binary 6in ar9"] = true,
+    ["ddm4 v7 drum"] = true, ["mpx drum"] = true, ["g26 clear drum"] = true,
+    ["black micro drac"] = true, ["arp9 clear drum"] = true, ["black micro draco"] = true
 }
 
--- Convertimos a minúsculas una sola vez (más rápido)
-local hidden  = {}
-local special = {}
-for _,v in ipairs(HIDDEN_TOOLS)  do hidden[string.lower(v)]  = true end
-for _,v in ipairs(SPECIAL_TOOLS) do special[string.lower(v)] = true end
+-- Performance variables
+local lower = string.lower
+local tick = tick
+local taskwait = task.wait
 
--- Crear Drawing una sola vez por jugador
-local function createESP(plr)
-    if plr == LocalPlayer or espDrawings[plr] then return end
+-- Player data structure
+local playerData = {}
+local activePlayers = {}
+local playerCount = 0
 
+-- Create drawing object for a player
+local function createDrawing()
     local txt = Drawing.new("Text")
-    txt.Size         = TEXT_SIZE
-    txt.Center       = true
-    txt.Outline      = true
-    txt.OutlineColor = Color3.new(0,0,0)
-    txt.Font         = Drawing.Fonts.GothamBold or 2
-    txt.Visible      = false
-    txt.Color        = Color3.fromRGB(230,230,230)
-
-    espDrawings[plr] = { text = txt }
+    txt.Size = TEXT_SIZE
+    txt.Center = true
+    txt.Outline = true
+    txt.OutlineColor = Color3_new(0, 0, 0)
+    txt.Font = 2
+    txt.Visible = false
+    txt.Color = Color3_fromRGB(255, 255, 255)
+    return txt
 end
 
--- Obtiene el texto y color de las herramientas (optimizado)
-local function getToolsText(plr)
-    local tools = {}
-
-    -- Herramienta equipada
+-- Fast tool collection
+local tempTools = {}
+local function collectToolsFast(plr)
+    -- Clear temp table
+    for i = 1, #tempTools do
+        tempTools[i] = nil
+    end
+    
     local char = plr.Character
-    if char then
-        local eq = char:FindFirstChildOfClass("Tool")
-        if eq and not hidden[string.lower(eq.Name)] then
-            table.insert(tools, eq.Name)
-        end
-    end
-
-    -- Backpack
-    local bp = plr:FindFirstChild("Backpack")
-    if bp then
-        for _, tool in ipairs(bp:GetChildren()) do
-            if tool:IsA("Tool") and not hidden[string.lower(tool.Name)] then
-                table.insert(tools, tool.Name)
-            end
-        end
-    end
-
-    if #tools == 0 then return nil end
-
-    -- Detectar si tiene arma peligrosa
+    if not char then return nil, 0, false end
+    
     local hasSpecial = false
-    for _, name in ipairs(tools) do
-        if special[string.lower(name)] then
-            hasSpecial = true
+    local toolCount = 0
+    
+    -- Check equipped tool
+    for _, child in char:GetChildren() do
+        if child.ClassName == "Tool" then
+            local name = child.Name
+            local nameLower = lower(name)
+            
+            if not HIDDEN_TOOLS[nameLower] then
+                tempTools[1] = name
+                toolCount = 1
+                
+                if SPECIAL_TOOLS[nameLower] then
+                    hasSpecial = true
+                end
+            end
             break
         end
     end
-
-    local color = hasSpecial and Color3.fromRGB(169, 39, 245) or Color3.fromRGB(255, 255, 255)
-
-    -- Si son pocas herramientas → mostrar todas
-    if #tools <= 5 then
-        return table.concat(tools, ", "), color
+    
+    -- Check backpack
+    local bp = plr:FindFirstChild("Backpack")
+    if bp then
+        for _, tool in bp:GetChildren() do
+            if tool.ClassName == "Tool" and toolCount < 6 then
+                local name = tool.Name
+                local nameLower = lower(name)
+                
+                if not HIDDEN_TOOLS[nameLower] then
+                    -- Check for duplicates
+                    local duplicate = false
+                    for i = 1, toolCount do
+                        if tempTools[i] == name then
+                            duplicate = true
+                            break
+                        end
+                    end
+                    
+                    if not duplicate then
+                        toolCount = toolCount + 1
+                        tempTools[toolCount] = name
+                        
+                        if SPECIAL_TOOLS[nameLower] then
+                            hasSpecial = true
+                        end
+                    end
+                end
+            end
+        end
     end
-
-    -- Si son muchas → abreviar
-    local short = {}
-    for i = 1, 4 do table.insert(short, tools[i]) end
-    table.insert(short, tools[5] .. " | +" .. (#tools - 4) .. " Más")
-    return table.concat(short, ", "), color
+    
+    if toolCount == 0 then return nil, 0, false end
+    
+    return tempTools, toolCount, hasSpecial
 end
 
--- Heartbeat principal (muy optimizado)
-RunService.Heartbeat:Connect(function()
+-- Format tools text
+local function formatToolsText(tools, count, hasSpecial)
+    local displayText = "["
+    
+    -- Show up to 4 tools
+    local showCount = math.min(4, count)
+    
+    for i = 1, showCount do
+        displayText = displayText .. tools[i]
+        if i < showCount then
+            displayText = displayText .. ", "
+        end
+    end
+    
+    if count > showCount then
+        displayText = displayText .. " +" .. (count - showCount)
+    end
+    
+    displayText = displayText .. "]"
+    
+    local color = hasSpecial and Color3_fromRGB(169, 39, 245) or Color3_fromRGB(255, 255, 255)
+    
+    return displayText, color
+end
+
+-- Update active players list
+local lastPlayerUpdate = 0
+local function updateActivePlayers()
+    local now = tick()
+    if now - lastPlayerUpdate < 0.3 then return end
+    
+    playerCount = 0
+    for _, plr in Players:GetPlayers() do
+        if plr ~= LocalPlayer and plr.Character then
+            playerCount = playerCount + 1
+            activePlayers[playerCount] = plr
+            
+            if not playerData[plr] then
+                playerData[plr] = {
+                    drawing = createDrawing(),
+                    lastUpdate = 0,
+                    text = "",
+                    color = Color3_fromRGB(255, 255, 255),
+                    hasTools = false
+                }
+            end
+        end
+    end
+    
+    lastPlayerUpdate = now
+end
+
+-- Main render loop - ULTRA SMOOTH
+local frame = 0
+local lastToolUpdate = 0
+
+RunService:BindToRenderStep("ToolsESPRender", Enum.RenderPriority.Camera.Value + 1, function()
     if not ToolsESP_Enabled then
-        for _, obj in pairs(espDrawings) do
-            obj.text.Visible = false
+        for _, data in pairs(playerData) do
+            if data.drawing.Visible then
+                data.drawing.Visible = false
+            end
         end
         return
     end
-
-    for plr, obj in pairs(espDrawings) do
-        local line, color = getToolsText(plr)
-
-        local head = plr.Character and plr.Character:FindFirstChild("Head")
-        if not line or not head then
-            obj.text.Visible = false
-            continue
-        end
-
-        local headPos = head.Position + Vector3.new(0, 3.6, 0)
-        local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
-        if not onScreen then
-            obj.text.Visible = false
-            continue
-        end
-
-        -- Ajuste automático de tamaño si el texto es muy ancho
-        local size = TEXT_SIZE
-        if size > 11 then
-            local bounds = TextService:GetTextSize(line, size, Enum.Font.GothamBold, Vector2.new(1e5, 50))
-            while bounds.X > MAX_WIDTH and size > 11 do
-                size -= 0.5
-                bounds = TextService:GetTextSize(line, size, Enum.Font.GothamBold, Vector2.new(1e5, 50))
+    
+    frame = frame + 1
+    
+    -- Update active players list periodically
+    updateActivePlayers()
+    
+    local now = tick()
+    local updateTools = (now - lastToolUpdate) >= 0.2  -- Update every 0.2 seconds
+    
+    if updateTools then
+        lastToolUpdate = now
+    end
+    
+    -- Process ALL players every frame for maximum smoothness
+    for i = 1, playerCount do
+        local plr = activePlayers[i]
+        if not plr then break end
+        
+        local data = playerData[plr]
+        if not data then continue end
+        
+        local char = plr.Character
+        if not char then
+            if data.drawing.Visible then
+                data.drawing.Visible = false
+                data.hasTools = false
             end
+            continue
         end
-
-        local txt = obj.text
-        txt.Size     = size
-        txt.Text     = line
-        txt.Color    = color
-        txt.Position = Vector2.new(screenPos.X, screenPos.Y)
-        txt.Visible  = true
+        
+        -- Update tools if needed
+        if updateTools or not data.hasTools then
+            local tools, count, hasSpecial = collectToolsFast(plr)
+            
+            if tools and count > 0 then
+                data.text, data.color = formatToolsText(tools, count, hasSpecial)
+                data.hasTools = true
+                data.drawing.Text = data.text
+                data.drawing.Color = data.color
+                data.drawing.Size = TEXT_SIZE
+            else
+                data.hasTools = false
+                if data.drawing.Visible then
+                    data.drawing.Visible = false
+                end
+                continue
+            end
+        elseif not data.hasTools then
+            continue
+        end
+        
+        -- Position below feet
+        local humanoidRootPart = char:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            local position = humanoidRootPart.Position
+            local footPos = position - Vector3_new(0, FOOT_OFFSET, 0)
+            
+            local screenPos, onScreen = WorldToViewportPoint(Camera, footPos)
+            
+            if onScreen then
+                -- SMOOTH position update every frame
+                data.drawing.Position = Vector2_new(screenPos.X, screenPos.Y)
+                if not data.drawing.Visible then
+                    data.drawing.Visible = true
+                end
+            elseif data.drawing.Visible then
+                data.drawing.Visible = false
+            end
+        elseif data.drawing.Visible then
+            data.drawing.Visible = false
+        end
     end
 end)
 
--- Limpiar al salir del juego
-Players.PlayerRemoving:Connect(function(plr)
-    local data = espDrawings[plr]
-    if data then
-        data.text:Remove()
-        espDrawings[plr] = nil
-    end
-end)
-
--- Crear ESP para jugadores existentes y nuevos
-for _, p in Players:GetPlayers() do
-    if p ~= LocalPlayer then createESP(p) end
+-- Player management
+local function setupPlayer(plr)
+    if plr == LocalPlayer then return end
+    
+    playerData[plr] = {
+        drawing = createDrawing(),
+        lastUpdate = 0,
+        text = "",
+        color = Color3_fromRGB(255, 255, 255),
+        hasTools = false
+    }
 end
-Players.PlayerAdded:Connect(function(p)
-    if p ~= LocalPlayer then createESP(p) end
+
+local function removePlayer(plr)
+    local data = playerData[plr]
+    if data then
+        data.drawing:Remove()
+        playerData[plr] = nil
+    end
+end
+
+-- Initialize all players
+task.spawn(function()
+    taskwait(0.1)
+    
+    local allPlayers = Players:GetPlayers()
+    for i, plr in ipairs(allPlayers) do
+        if plr ~= LocalPlayer then
+            setupPlayer(plr)
+        end
+    end
+    
+    updateActivePlayers()
 end)
 
--- TOGGLE + SLIDER (sin spam y más limpio)
+-- Player events
+Players.PlayerAdded:Connect(function(plr)
+    if plr ~= LocalPlayer then
+        taskwait(0.1)
+        setupPlayer(plr)
+        updateActivePlayers()
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    removePlayer(plr)
+    updateActivePlayers()
+end)
+
+-- UI Elements
 ESPV2Box:AddToggle("ToolsESP", {
-    Text = "ESP Show Guns",
+    Text = "Tools ESP",
     Default = false,
     Callback = function(state)
         ToolsESP_Enabled = state
-        Library:Notify(state and "ESP Tools V2 Activado" or "ESP Tools V2 Desactivado", 3)
     end
 })
 
 ESPV2Box:AddSlider("ESPToolsSize", {
-    Text = "Guns Size",
-    Min = 0,
-    Max = 100,
-    Default = 0,
+    Text = "Text Size",
+    Min = 8,
+    Max = 20,
+    Default = 12,
     Rounding = 1,
-    Callback = function(v)
-        TEXT_SIZE = v
+    Callback = function(value)
+        TEXT_SIZE = value
+        -- Apply to all active drawings
+        for _, data in pairs(playerData) do
+            if data.drawing then
+                data.drawing.Size = value
+            end
+        end
     end
 })
 
@@ -2204,7 +2373,7 @@ HardlockBox:AddLabel("FOV Border Color"):AddColorPicker("HardlockFOVColor", {Def
 -- ✅ Visual exacto (Head grande transparency 0.6)
 -- ✅ Bypass anti-cheats: Adonis, Crystal, Solara, etc.
 -- ✅ Anti-report visual (delays randomizados)
--- ✅ Friends Team + Alive Check intacto
+-- ✅ Friends Team + Alive Check FIXED
 -- =====================================================
 
 local Players = game:GetService("Players")
@@ -2229,11 +2398,18 @@ local availableParts = {"Head", "UpperTorso", "RightUpperLeg", "LeftUpperLeg", "
 -- FUNCIONES DE SEGURIDAD (ANTES DE USAR HITBOX)
 -- =====================================================
 
--- ✅ Verifica si jugador está vivo (evita spam en muertos)
+-- ✅ Verifica si jugador está vivo (evita spam en muertos) - MEJORADA
 local function isPlayerAlive(plr)
-    if not plr.Character then return false end
+    if not plr or not plr.Character then return false end
     local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
-    return humanoid and humanoid.Health > 0
+    if not humanoid then return false end
+    
+    -- Verifica múltiples condiciones de "muerte"
+    local isDead = humanoid.Health <= 0
+    local isGettingUp = humanoid:GetState() == Enum.HumanoidStateType.GettingUp
+    local isDeadState = humanoid:GetState() == Enum.HumanoidStateType.Dead
+    
+    return not (isDead or isDeadState or isGettingUp)
 end
 
 -- ✅ Verifica si es amigo (protege team/friends)
@@ -2243,17 +2419,22 @@ local function isFriend(plr)
 end
 
 -- =====================================================
--- FUNCIÓN PRINCIPAL EXPAND() - BYPASS ULTRA AVANZADO
+-- FUNCIÓN PRINCIPAL EXPAND() - BYPASS ULTRA AVANZADO CON FIX ALIVE CHECK
 -- =====================================================
 local function expand()
     -- Anti-loop detection: solo procesa jugadores vivos/activos
     for _, plr in Players:GetPlayers() do
-        -- Skip: localplayer, amigos, muertos
+        -- Skip: localplayer, amigos
         if plr ~= LocalPlayer and plr.Character and not isFriend(plr) then
-            if aliveCheckEnabled and not isPlayerAlive(plr) then continue end
             
             local part = plr.Character:FindFirstChild(selectedPart)
             if part and part:IsA("BasePart") then
+                
+                -- ✅ ALIVE CHECK FIX: Verifica si el jugador está vivo
+                local shouldProcess = true
+                if aliveCheckEnabled then
+                    shouldProcess = isPlayerAlive(plr)
+                end
                 
                 -- ✅ Guarda original SOLO UNA VEZ (evita spam writes)
                 if not originalData[plr] then
@@ -2261,16 +2442,38 @@ local function expand()
                         Size = part.Size,
                         Transparency = part.Transparency,
                         CanCollide = part.CanCollide,
-                        Massless = part.Massless
+                        Massless = part.Massless,
+                        PlayerName = plr.Name -- Para debugging
                     }
                 end
                 
-                -- ✅ HITBOX MODIFICACIONES (tu visual preferido)
-                part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                part.Transparency = 0.6  -- Exactamente como querías
-                part.CanCollide = false   -- Necesario para hitreg
-                part.Massless = true      -- Anti-física detection
-                
+                if hitboxEnabled then
+                    -- ✅ SOLO aplica hitbox si el jugador está vivo (si aliveCheck está activado)
+                    if shouldProcess then
+                        part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                        part.Transparency = 0.6  -- Exactamente como querías
+                        part.CanCollide = false   -- Necesario para hitreg
+                        part.Massless = true      -- Anti-física detection
+                    else
+                        -- ✅ RESTAURA inmediatamente si el jugador está muerto y aliveCheck está activado
+                        local data = originalData[plr]
+                        if data then
+                            part.Size = data.Size
+                            part.Transparency = data.Transparency
+                            part.CanCollide = data.CanCollide
+                            part.Massless = data.Massless
+                        end
+                    end
+                else
+                    -- Si hitbox está desactivado, restaura inmediatamente
+                    local data = originalData[plr]
+                    if data then
+                        part.Size = data.Size
+                        part.Transparency = data.Transparency
+                        part.CanCollide = data.CanCollide
+                        part.Massless = data.Massless
+                    end
+                end
             end
         end
         
@@ -2281,14 +2484,15 @@ local function expand()
 end
 
 -- =====================================================
--- RESTORE PERFECTO (anti-leak detection)
+-- RESTORE PERFECTO (anti-leak detection) - CORREGIDO
 -- =====================================================
 local function restoreAll()
+    -- 1. Restaura desde originalData
     for plr, data in pairs(originalData) do
         -- Verifica que siga existiendo la parte
-        if plr.Character and plr.Character:FindFirstChild(selectedPart) then
+        if plr and plr.Character and plr.Character:FindFirstChild(selectedPart) then
             local part = plr.Character[selectedPart]
-            if part then
+            if part and data then
                 -- ✅ Restaura TODO exactamente como estaba
                 part.Size = data.Size
                 part.Transparency = data.Transparency
@@ -2297,7 +2501,69 @@ local function restoreAll()
             end
         end
     end
-    originalData = {}  -- Limpia memoria (anti-memory leak)
+    
+    -- 2. ✅ FIX CRÍTICO: Restaura también jugadores actuales que no estén en originalData
+    for _, plr in Players:GetPlayers() do
+        if plr ~= LocalPlayer and plr.Character and not isFriend(plr) then
+            local part = plr.Character:FindFirstChild(selectedPart)
+            if part and part:IsA("BasePart") then
+                -- Solo restaura si no tenemos datos guardados
+                if not originalData[plr] then
+                    -- Valores por defecto comunes
+                    part.Size = Vector3.new(1, 1, 1) -- Tamaño por defecto de Head
+                    part.Transparency = 0
+                    part.CanCollide = true
+                    part.Massless = false
+                end
+            end
+        end
+    end
+    
+    -- 3. ✅ FIX ALIVE CHECK: Limpia jugadores muertos de originalData
+    for plr, data in pairs(originalData) do
+        if plr and plr.Character then
+            if aliveCheckEnabled and not isPlayerAlive(plr) then
+                -- Si el jugador está muerto y aliveCheck está activado, elimínalo de originalData
+                originalData[plr] = nil
+            end
+        elseif not plr.Character then
+            -- Si el jugador no tiene character, también elimínalo
+            originalData[plr] = nil
+        end
+    end
+end
+
+-- =====================================================
+-- FUNCIÓN DE LIMPIEZA ESPECÍFICA PARA ALIVE CHECK
+-- =====================================================
+local function cleanupDeadPlayers()
+    if not aliveCheckEnabled then return end
+    
+    local playersToRemove = {}
+    
+    for plr, data in pairs(originalData) do
+        if plr and plr.Character then
+            if not isPlayerAlive(plr) then
+                -- Restaura al jugador muerto inmediatamente
+                local part = plr.Character:FindFirstChild(selectedPart)
+                if part and part:IsA("BasePart") and data then
+                    part.Size = data.Size
+                    part.Transparency = data.Transparency
+                    part.CanCollide = data.CanCollide
+                    part.Massless = data.Massless
+                end
+                table.insert(playersToRemove, plr)
+            end
+        else
+            -- Si el jugador ya no existe o no tiene character
+            table.insert(playersToRemove, plr)
+        end
+    end
+    
+    -- Elimina los jugadores muertos de originalData
+    for _, plr in ipairs(playersToRemove) do
+        originalData[plr] = nil
+    end
 end
 
 -- =====================================================
@@ -2305,40 +2571,66 @@ end
 -- =====================================================
 local HitboxBox = Tabs.Combat:AddLeftGroupbox("Hitbox Expander", "target")
 
--- Toggle principal con BYPASS RenderStepped (más seguro que Heartbeat)
+-- Toggle principal con BYPASS RenderStepped (más seguro que Heartbeat) - CORREGIDO
 HitboxBox:AddToggle("HitboxPC", {
     Text = "Hitbox Expander", 
     Default = false, 
     Callback = function(state)
         hitboxEnabled = state
+        
         if hitboxEnabled then
             -- ✅ Limpia conexión anterior
-            if connection then connection:Disconnect() end
+            if connection then 
+                connection:Disconnect() 
+                connection = nil
+            end
             -- 🚀 RenderStepped = menos detectable que Heartbeat
-            connection = RunService.RenderStepped:Connect(expand)
+            connection = RunService.RenderStepped:Connect(function()
+                expand()
+                -- ✅ Ejecuta limpieza de jugadores muertos cada frame
+                if aliveCheckEnabled then
+                    cleanupDeadPlayers()
+                end
+            end)
             Library:Notify("Hitbox Expander ➜ ON", 3)
         else
-            -- ✅ Limpieza perfecta
+            -- ✅ DESCONECTA PRIMERO la conexión
             if connection then 
                 connection:Disconnect() 
                 connection = nil 
             end
-            restoreAll()
+            
+            -- ✅ EJECUTA UNA ÚLTIMA VERSIÓN DE expand() para restaurar todo
+            hitboxEnabled = false
+            task.spawn(function()
+                expand() -- Ejecuta con hitboxEnabled = false para restaurar
+                restoreAll() -- Limpieza final completa
+            end)
+            
             Library:Notify("Hitbox Expander ➜ OFF", 3)
         end
     end
 })
 
--- Toggle Alive Check (sin cambios)
+-- Toggle Alive Check (MEJORADO)
 HitboxBox:AddToggle("AliveCheck", {
     Text = "Alive Check", 
     Default = true, 
     Callback = function(state)
         aliveCheckEnabled = state
         if hitboxEnabled then 
-            restoreAll() 
-            task.wait(0.05) 
-            expand() 
+            -- ✅ FIX: Ejecuta limpieza inmediata de jugadores muertos
+            if not state then
+                -- Si se desactiva aliveCheck, restaura a todos los jugadores primero
+                restoreAll()
+                task.wait(0.05)
+                expand()
+            else
+                -- Si se activa aliveCheck, limpia jugadores muertos inmediatamente
+                cleanupDeadPlayers()
+                task.wait(0.05)
+                expand()
+            end
         end
     end
 })
@@ -2373,7 +2665,12 @@ HitboxBox:AddSlider("HitboxSize", {
     Callback = function(value)
         hitboxSize = value
         if hitboxEnabled then 
-            task.spawn(expand)  -- task.spawn = menos detectable
+            task.spawn(function()
+                expand()
+                if aliveCheckEnabled then
+                    cleanupDeadPlayers()
+                end
+            end)
         end
     end
 })
@@ -2418,9 +2715,14 @@ Players.PlayerAdded:Connect(function(plr)
     end
 end)
 
-Players.PlayerRemoving:Connect(function()
+Players.PlayerRemoving:Connect(function(plr)
     task.wait(0.1)
     UpdatePlayerDropdown()
+    
+    -- ✅ FIX: Limpia datos del jugador que se va
+    if originalData[plr] then
+        originalData[plr] = nil
+    end
 end)
 
 -- ✅ Add Friend (sin cambios)
@@ -2460,6 +2762,27 @@ HitboxBox:AddButton("Clear Friends Team", function()
 end)
 
 -- =====================================================
+-- LIMPIEZA PERIÓDICA (ANTI-MEMORY LEAK) - MEJORADA
+-- =====================================================
+task.spawn(function()
+    while true do
+        task.wait(0.5) -- Verifica cada 0.5 segundos (más rápido para alive check)
+        if hitboxEnabled and aliveCheckEnabled then
+            cleanupDeadPlayers()
+        end
+        
+        -- Limpieza general cada 30 segundos
+        if tick() % 30 < 0.5 then -- Cada ~30 segundos
+            for plr, _ in pairs(originalData) do
+                if not Players:FindFirstChild(plr.Name) then
+                    originalData[plr] = nil
+                end
+            end
+        end
+    end
+end)
+
+-- =====================================================
 -- BYPASS FEATURES ACTIVAS:
 -- ✅ RenderStepped (menos detectable que Heartbeat)
 -- ✅ Delays randomizados (anti-pattern detection)
@@ -2467,8 +2790,9 @@ end)
 -- ✅ Limpieza perfecta de memoria/conexiones
 -- ✅ Original data guardado UNA SOLA VEZ
 -- ✅ HumanoidRootPart como opción secreta
+-- ✅ FIX CRÍTICO: Restauración completa al desactivar
+-- ✅ FIX ALIVE CHECK: Jugadores muertos se restauran inmediatamente
 -- =====================================================
--- ¡LISTO PARA USAR! 🔥 100% Bypass garantizado 2025
 
 local AntiAFKConnection
 CharacterBox:AddToggle("Anti-AFK", {
