@@ -1968,18 +1968,29 @@ ESPV2Box:AddToggle("HealthTeamCheck", {
 })
 
 
+-- =====================================================
+-- AIMLOCK COMPLETO + FRIENDS TEAM (como en Hitbox)
+-- =====================================================
+
 getgenv().Aimlock = {
     Enabled = false,
     Aiming = false,
     Part = "Head",
     OldPart = "Head",
-    Radius = 80,
+    Radius = 180,
+    MaxDistance = 500,
     TeamCheck = false,
     Predict = true,
     Prediction = 15,
     Smooth = 0.14,
     AliveCheck = false,
-    Airshot = false
+    Airshot = false,
+    
+    NotifyOnLock = true,
+    NotifyOnKill = true,
+    
+    -- Friends Team (ignorados en aimlock)
+    Friends = {}  -- lista de nombres (Name o DisplayName)
 }
 
 local Players = game:GetService("Players")
@@ -1989,10 +2000,11 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
 local Target = nil
+local LastTarget = nil
 
 -- FOV Circle
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Radius = 80
+FOVCircle.Radius = getgenv().Aimlock.Radius
 FOVCircle.Color = Color3.fromRGB(255, 0, 70)
 FOVCircle.Thickness = 1.6
 FOVCircle.NumSides = 16
@@ -2004,145 +2016,263 @@ RunService.RenderStepped:Connect(function()
     FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
 end)
 
+local function isFriend(plr)
+    if not plr then return false end
+    return table.find(getgenv().Aimlock.Friends, plr.Name) or table.find(getgenv().Aimlock.Friends, plr.DisplayName)
+end
+
 local function GetClosest()
     local closest = nil
-    local dist = getgenv().Aimlock.Radius
-
+    local minDist = getgenv().Aimlock.Radius
+    local camPos = Camera.CFrame.Position
+    
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            if getgenv().Aimlock.TeamCheck and plr.Team == LocalPlayer.Team then continue end
-            local part = plr.Character:FindFirstChild(getgenv().Aimlock.Part) or plr.Character:FindFirstChild("Head")
-            if part then
-                local sp, onscreen = Camera:WorldToViewportPoint(part.Position)
-                if onscreen then
-                    local d = (Vector2.new(sp.X, sp.Y) - Vector2.new(Mouse.X, Mouse.Y + 36)).Magnitude
-                    if d < dist then
-                        dist = d
-                        closest = plr
-                    end
-                end
-            end
+        if plr == LocalPlayer then continue end
+        if isFriend(plr) then continue end  -- Ignorar amigos
+        
+        local char = plr.Character
+        if not (char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0) then continue end
+        
+        if getgenv().Aimlock.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+        
+        local part = char:FindFirstChild(getgenv().Aimlock.Part) or char:FindFirstChild("Head")
+        if not part then continue end
+        
+        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then continue end
+        
+        local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y + 36)).Magnitude
+        local realDist = (camPos - part.Position).Magnitude
+        local distAllowed = getgenv().Aimlock.MaxDistance <= 0 or realDist <= getgenv().Aimlock.MaxDistance
+        
+        if distAllowed and screenDist < minDist then
+            minDist = screenDist
+            closest = plr
         end
     end
+    
     return closest
 end
 
 RunService.Heartbeat:Connect(function()
-    if not getgenv().Aimlock.Enabled or not getgenv().Aimlock.Aiming then return end
-
-    Target = GetClosest()
-
-    if getgenv().Aimlock.AliveCheck and Target and Target.Character and Target.Character:FindFirstChild("Humanoid") and Target.Character.Humanoid.Health <= 0 then
+    if not getgenv().Aimlock.Enabled or not getgenv().Aimlock.Aiming then
         Target = nil
+        LastTarget = nil
+        return
     end
-
-    if getgenv().Aimlock.Airshot and Target and Target.Character:FindFirstChild("Humanoid") then
-        if Target.Character.Humanoid.FloorMaterial == Enum.Material.Air then
+    
+    Target = GetClosest()
+    
+    if Target and Target ~= LastTarget and getgenv().Aimlock.NotifyOnLock then
+        Library:Notify("Locked onto: " .. Target.Name, 2.5)
+        LastTarget = Target
+    end
+    
+    if not Target and LastTarget then
+        LastTarget = nil
+    end
+    
+    if Target and Target.Character and Target.Character:FindFirstChild("Humanoid") 
+        and Target.Character.Humanoid.Health <= 0 and getgenv().Aimlock.NotifyOnKill then
+        Library:Notify("Killed: " .. Target.Name, 3)
+        Target = nil
+        LastTarget = nil
+    end
+    
+    if getgenv().Aimlock.Airshot and Target and Target.Character and Target.Character:FindFirstChild("Humanoid") then
+        local hum = Target.Character.Humanoid
+        if hum:GetState() == Enum.HumanoidStateType.Freefall or hum.FloorMaterial == Enum.Material.Air then
             getgenv().Aimlock.Part = "RightFoot"
         else
             getgenv().Aimlock.Part = getgenv().Aimlock.OldPart
         end
     end
-
+    
     if Target and Target.Character and Target.Character:FindFirstChild(getgenv().Aimlock.Part) then
         local pos = Target.Character[getgenv().Aimlock.Part].Position
         if getgenv().Aimlock.Predict then
-            pos = pos + (Target.Character[getgenv().Aimlock.Part].Velocity / getgenv().Aimlock.Prediction)
+            pos += Target.Character[getgenv().Aimlock.Part].Velocity / getgenv().Aimlock.Prediction
         end
+        local targetCF = CFrame.new(Camera.CFrame.Position, pos)
         if getgenv().Aimlock.Smooth > 0 then
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, pos), getgenv().Aimlock.Smooth)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCF, getgenv().Aimlock.Smooth)
         else
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, pos)
+            Camera.CFrame = targetCF
         end
     end
 end)
 
+-- =====================================================
+-- UI - ColorPicker encadenado al Toggle (como tu ejemplo)
+-- Friends Team igual que en Hitbox
+-- =====================================================
+
 local AimBox = Tabs.Combat:AddLeftGroupbox("Aimlock (PC Only)", "sword")
 
--- Toggle principal + KeyPicker encadenado (esto sí funciona en tu versión)
-AimBox:AddToggle("AimlockEnabled", {  -- ← Aquí va el índice
+local aimMasterToggle = AimBox:AddToggle("AimlockEnabled", {
     Text = "Aim Assist",
     Default = false,
-    Tooltip = "Activa el aimlock",
+    Tooltip = "It must be ON for the key to work",
     Callback = function(v)
         getgenv().Aimlock.Enabled = v
+        if not v then getgenv().Aimlock.Aiming = false end
     end
-}):AddKeyPicker("AimlockKey", {  -- ← Aquí va el índice del KeyPicker
+})
+
+aimMasterToggle:AddKeyPicker("AimlockKey", {
     Default = "B",
-    SyncToggleState = true,
+    SyncToggleState = false,
     Mode = "Toggle",
-    Text = "Aimlock Key",
+    Text = "Activation Key",
+    Tooltip = "It only works if the master is ON.",
     Callback = function(v)
-        getgenv().Aimlock.Aiming = v
+        if getgenv().Aimlock.Enabled then
+            getgenv().Aimlock.Aiming = v
+        else
+            getgenv().Aimlock.Aiming = false
+        end
     end
 })
 
 AimBox:AddDropdown("AimPart", {
     Values = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"},
     Default = 1,
-    Text = "Aim Part",
+    Text = "BodyPart",
     Callback = function(v)
         getgenv().Aimlock.Part = v
         getgenv().Aimlock.OldPart = v
     end
 })
 
-AimBox:AddToggle("TeamCheck", { Text = "Team Check", Default = false, Callback = function(v) getgenv().Aimlock.TeamCheck = v end })
-AimBox:AddToggle("AliveCheck", { Text = "Alive Check", Default = false, Callback = function(v) getgenv().Aimlock.AliveCheck = v end })
-AimBox:AddToggle("Prediction", { Text = "Prediction", Default = false, Callback = function(v) getgenv().Aimlock.Predict = v end })
-AimBox:AddToggle("Airshot", { Text = "Airshot Function", Default = false, Callback = function(v) getgenv().Aimlock.Airshot = v end })
+AimBox:AddToggle("TeamCheck", {Text = "Team Check", Default = false, Callback = function(v) getgenv().Aimlock.TeamCheck = v end})
+AimBox:AddToggle("AliveCheck", {Text = "Alive Check", Default = false, Callback = function(v) getgenv().Aimlock.AliveCheck = v end})
+AimBox:AddToggle("Prediction", {Text = "Prediction", Default = true, Callback = function(v) getgenv().Aimlock.Predict = v end})
+AimBox:AddToggle("Airshot", {Text = "Airshot Function", Default = false, Callback = function(v) getgenv().Aimlock.Airshot = v end})
 
 AimBox:AddSlider("Smoothness", {
     Text = "Smoothness",
-    Default = 0,
+    Default = 0.14,
     Min = 0,
     Max = 1,
     Rounding = 2,
-    Callback = function(v)
-        getgenv().Aimlock.Smooth = v
-    end
+    Callback = function(v) getgenv().Aimlock.Smooth = v end
 })
 
 AimBox:AddSlider("PredictionPower", {
     Text = "Prediction Movement",
-    Default = 0,
+    Default = 15,
     Min = 0,
     Max = 50,
     Rounding = 1,
-    Callback = function(v)
-        getgenv().Aimlock.Prediction = v
-    end
+    Callback = function(v) getgenv().Aimlock.Prediction = v end
 })
 
--- FOV
-local FOVBox = Tabs.Combat:AddRightGroupbox("FOV", "circle")
+AimBox:AddToggle("NotifyLock", {Text = "Notify on Target Lock", Default = true, Callback = function(v) getgenv().Aimlock.NotifyOnLock = v end})
+AimBox:AddToggle("NotifyKill", {Text = "Notify on Kill", Default = true, Callback = function(v) getgenv().Aimlock.NotifyOnKill = v end})
+
+AimBox:AddInput("MaxDistance", {
+    Text = "Max Distance (studs)",
+    Default = "500",
+    Placeholder = "0 = No limit",
+    Numeric = true,
+    Callback = function(v) getgenv().Aimlock.MaxDistance = tonumber(v) or 0 end
+})
+
+-- FOV Circle - ColorPicker encadenado al toggle (como en tu ejemplo)
+local FOVBox = Tabs.Combat:AddRightGroupbox("FOV Circle", "circle")
 
 FOVBox:AddToggle("ShowFOV", {
-    Text = "Show FOV Circle",
+    Text = "Show Circle",
     Default = false,
-    Callback = function(v)
-        FOVCircle.Visible = v
+    Callback = function(v) 
+        FOVCircle.Visible = v 
+    end
+}):AddColorPicker("FOVColor", {
+    Default = Color3.fromRGB(255, 0, 70),
+    Title = "FOV Color",
+    Callback = function(color)
+        FOVCircle.Color = color
     end
 })
 
 FOVBox:AddSlider("FOVSize", {
-    Text = "FOV Radius",
-    Default = 0,
-    Min = 0,
-    Max = 300,
-    Rounding = 1,
+    Text = "Size (px)",
+    Default = 180,
+    Min = 50,
+    Max = 450,
+    Rounding = 0,
     Callback = function(v)
         getgenv().Aimlock.Radius = v
         FOVCircle.Radius = v
     end
 })
 
-FOVBox:AddLabel("FOV Color"):AddColorPicker("FOVColor", {
-    Default = Color3.fromRGB(255, 0, 70),
-    Callback = function(v)
-        FOVCircle.Color = v
-    end
+-- =====================================================
+-- FRIENDS TEAM (exactamente igual que en tu Hitbox)
+-- =====================================================
+
+AimBox:AddDivider()
+AimBox:AddLabel("Friends Team (Ignored)")
+
+local friendDropdown = AimBox:AddDropdown("FriendSelect", {
+    Text = "Select Player",
+    Values = {"----"},
+    Default = 1,
+    Callback = function() end
 })
+
+-- Función para actualizar dropdown de jugadores
+local function UpdateFriendDropdown()
+    local values = {"----"}
+    for _, plr in Players:GetPlayers() do
+        if plr ~= LocalPlayer then
+            table.insert(values, plr.DisplayName .. " (" .. plr.Name .. ")")
+        end
+    end
+    if #values == 1 then
+        values = {"---- (No players)"}
+    end
+    friendDropdown:SetValues(values)
+    if friendDropdown.Value == "----" or not table.find(values, friendDropdown.Value) then
+        friendDropdown:SetValue("----")
+    end
+end
+
+UpdateFriendDropdown()
+
+Players.PlayerAdded:Connect(function(plr)
+    if plr ~= LocalPlayer then task.wait(0.1) UpdateFriendDropdown() end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    task.wait(0.1)
+    UpdateFriendDropdown()
+end)
+
+AimBox:AddButton("Add to Friends", function()
+    local selected = friendDropdown.Value
+    if not selected or selected == "----" or selected == "---- (No players)" then
+        Library:Notify("Select a player first", 3)
+        return
+    end
+    local username = selected:match("%((.-)%)") or selected
+    local displayname = selected:match("(.-)%s%(") or selected
+    local targetName = username or displayname
+    
+    if not table.find(getgenv().Aimlock.Friends, targetName) then
+        table.insert(getgenv().Aimlock.Friends, targetName)
+        Library:Notify("Friend added: " .. selected .. " (ignored)", 4)
+        friendDropdown:SetValue("----")
+    else
+        Library:Notify("It's already on Friends Team", 3)
+    end
+end)
+
+AimBox:AddButton("Clear Friends List", function()
+    getgenv().Aimlock.Friends = {}
+    Library:Notify("Friends Team cleaned up"", 4)
+    friendDropdown:SetValue("----")
+end)
 
 getgenv().Hardlock = {
     Enabled = false,
@@ -2810,88 +2940,6 @@ CharacterBox:AddToggle("Anti-AFK", {
                 AntiAFKConnection = nil
             end
             Library:Notify("Anti-AFK Desactivado", 3)
-        end
-    end
-})
-local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-
-local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GiveFloatingGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("CoreGui")
-
-local GiveFrame = Instance.new("Frame")
-GiveFrame.Size = UDim2.new(0, 110, 0, 30)
-GiveFrame.Position = UDim2.new(0, 20, 0.5, -100)
-GiveFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-GiveFrame.BorderSizePixel = 0
-GiveFrame.Visible = false
-GiveFrame.Parent = ScreenGui
-
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 6)
-Corner.Parent = GiveFrame
-
-local Border = Instance.new("UIStroke")
-Border.Color = Color3.fromRGB(105, 9, 179)
-Border.Thickness = 1
-Border.Parent = GiveFrame
-
-local GiveLabel = Instance.new("TextLabel")
-GiveLabel.Size = UDim2.new(1, 0, 1, 0)
-GiveLabel.BackgroundTransparency = 1
-GiveLabel.Text = "Give"
-GiveLabel.TextSize = 14
-GiveLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-GiveLabel.Font = Enum.Font.GothamBold
-GiveLabel.Parent = GiveFrame
-
-GiveFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        TweenService:Create(GiveFrame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(141, 35, 222)}):Play()
-    end
-end)
-
-GiveFrame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        TweenService:Create(GiveFrame, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
-    end
-end)
-
-local function SimulateQ()
-    local hold = math.random(60, 140) / 1000
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
-    task.wait(hold)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
-end
-
-GiveFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        SimulateQ()
-    end
-end)
-
-ExploitsBox:AddToggle("ShowGiveFloating", {
-    Text = "Show Give Button (Mobile Only)",
-    Default = false,
-    Tooltip = "Shows floating 'Give' button - Works only on Mobile",
-    Callback = function(state)
-        if not isMobile then
-            Library.Options.ShowGiveFloating:SetValue(false)
-            Library:Notify("This feature is only available on Mobile", 5)
-            return
-        end
-        GiveFrame.Visible = state
-        if state then
-            Library:Notify("Give Button ON (Mobile)", 5)
-        else
-            Library:Notify("Give Button OFF", 3)
         end
     end
 })
