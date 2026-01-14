@@ -466,7 +466,7 @@ CharacterBox:AddToggle("Fullbright", {
     end
 })
 
-local ESPV2Box = Tabs.Visuals:AddRightGroupbox("ESP Guns, "anvil")
+local ESPV2Box = Tabs.Visuals:AddRightGroupbox("ESP Guns", "anvil")
 
 local Players         = game:GetService("Players")
 local RunService      = game:GetService("RunService")
@@ -2196,7 +2196,7 @@ FOVBox:AddToggle("ShowFOV", {
 })
 
 FOVBox:AddSlider("FOVSize", {
-    Text = "Size (px)",
+    Text = "Radius (px)",
     Default = 180,
     Min = 50,
     Max = 450,
@@ -2270,7 +2270,7 @@ end)
 
 AimBox:AddButton("Clear Friends List", function()
     getgenv().Aimlock.Friends = {}
-    Library:Notify("Friends Team cleaned up"", 4)
+    Library:Notify("Team of friends cleaned", 4)
     friendDropdown:SetValue("----")
 end)
 
