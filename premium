@@ -466,7 +466,7 @@ CharacterBox:AddToggle("Fullbright", {
     end
 })
 
-local ESPV2Box = Tabs.Visuals:AddRightGroupbox("ESP V2 (Ultra Optimized)", "anvil")
+local ESPV2Box = Tabs.Visuals:AddRightGroupbox("ESP Guns, "anvil")
 
 local Players         = game:GetService("Players")
 local RunService      = game:GetService("RunService")
